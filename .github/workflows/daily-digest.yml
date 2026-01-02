@@ -1,0 +1,71 @@
+name: Generate Daily Global News Digest
+
+on:
+schedule:
+    # Run daily at 7 AM UTC (adjust for your timezone)
+-cron:'0 7 * * *'
+workflow_dispatch:  # Allow manual triggers
+
+jobs:
+generate-digest:
+runs-on: ubuntu-latest
+
+steps:
+-name: Checkout repository
+uses: actions/checkout@v3
+with:
+token: ${{ secrets.GITHUB_TOKEN }}
+
+-name: Setup Node.js
+uses: actions/setup-node@v3
+with:
+node-version:'18'
+
+-name: Install dependencies
+        run:|
+          npm install anthropic feedparser xml2js
+
+-name: Generate digest
+env:
+ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+run: node scripts/generate-digest.js
+
+-name: Commit and push digest
+        run:|
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
+          git add src/content/digests/
+          git diff --quiet && git diff --staged --quiet || \
+            (git commit -m "Daily digest: $(date +'%Y-%m-%d')" && git push)
+
+-name: Trigger Astro build
+uses: actions/github-script@v6
+with:
+          script:|
+            github.rest.repos.createDispatchEvent({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              event_type: 'deploy-site'
+            })
+
+deploy-site:
+needs: generate-digest
+runs-on: ubuntu-latest
+if: github.event_name == 'repository_dispatch' && github.event.action == 'deploy-site'
+
+permissions:
+contents: read
+pages: write
+id-token: write
+
+steps:
+-uses: actions/checkout@v3
+-uses: actions/setup-node@v3
+with:
+node-version:'18'
+-run: npm ci
+-run: npm run build
+-uses: actions/upload-pages-artifact@v2
+with:
+path:'./dist'
+-uses: actions/deploy-pages@v2
