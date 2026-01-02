@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # IMPORTANT: ensure full history
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -26,6 +28,18 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      # 🔎 DEBUG STEP — THIS IS THE KEY
+      - name: Debug – show filesystem
+        run: |
+          echo "PWD:"
+          pwd
+          echo ""
+          echo "Root directory:"
+          ls -la
+          echo ""
+          echo "Scripts directory:"
+          ls -la scripts || echo "❌ scripts directory missing"
 
       - name: Generate digest
         env:
@@ -52,4 +66,3 @@ jobs:
 
       - name: Deploy to GitHub Pages
         uses: actions/deploy-pages@v4
-
